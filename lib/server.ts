@@ -22,15 +22,15 @@ export function bucket() {
 }
 
 export async function understand(input: string, image?: string) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not configured');
   const content: Array<Record<string, string>> = [{ type: 'input_text', text: input }];
   if (image) content.push({ type: 'input_image', image_url: image });
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await fetch('https://api.deepseek.com/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gpt-5.4-mini',
+      model: image ? 'deepseek-v4-flash-vision-exp' : 'deepseek-v4-flash',
       input: [{ role: 'user', content }],
       text: { format: { type: 'json_schema', name: 'lost_item', strict: true, schema: {
         type: 'object', additionalProperties: false,
@@ -44,8 +44,8 @@ export async function understand(input: string, image?: string) {
       store: false,
     }),
   });
-  if (!response.ok) throw new Error(`OpenAI request failed: ${response.status}`);
+  if (!response.ok) throw new Error(`DeepSeek request failed: ${response.status}`);
   const data = await response.json() as { output_text?: string };
-  if (!data.output_text) throw new Error('OpenAI returned no structured output');
+  if (!data.output_text) throw new Error('DeepSeek returned no structured output');
   return JSON.parse(data.output_text) as { category: string; color: string; material: string; features: string[]; location: string; time: string };
 }

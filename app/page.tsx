@@ -122,7 +122,7 @@ export default function Home() {
                     })),
                 );
         } catch {
-            toast('尚未配置 API Key，当前展示演示匹配结果');
+            toast('尚未配置 DeepSeek API Key，当前展示演示匹配结果');
         } finally {
             setLoading(false);
             go('results');
@@ -146,7 +146,7 @@ export default function Home() {
             if (!response.ok) throw new Error();
             setAnalysis((await response.json()) as Analysis);
         } catch {
-            toast('尚未配置 API Key，当前展示演示识别结果');
+            toast('尚未配置 DeepSeek API Key，当前展示演示识别结果');
         }
         setReportStep('confirm');
     }
@@ -271,7 +271,7 @@ export default function Home() {
                                         </p>
                                     </div>
                                     <span className="h-fit rounded-full bg-[#eaf7f3] px-2.5 py-1 text-[11px] font-semibold text-[#13766d]">
-                                        ● AI 在线
+                                        ● DeepSeek 在线
                                     </span>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-[#fbfdfd] p-2">
