@@ -22,7 +22,8 @@ export function bucket() {
 }
 
 export async function understand(input: string, image?: string) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = (env as unknown as { DEEPSEEK_API_KEY?: string }).DEEPSEEK_API_KEY
+    ?? process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not configured');
   const content: Array<Record<string, string>> = [{ type: 'input_text', text: input }];
   if (image) content.push({ type: 'input_image', image_url: image });
@@ -45,7 +46,12 @@ export async function understand(input: string, image?: string) {
     }),
   });
   if (!response.ok) throw new Error(`DeepSeek request failed: ${response.status}`);
-  const data = await response.json() as { output_text?: string };
-  if (!data.output_text) throw new Error('DeepSeek returned no structured output');
-  return JSON.parse(data.output_text) as { category: string; color: string; material: string; features: string[]; location: string; time: string };
+  const data = await response.json() as {
+    output_text?: string;
+    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  };
+  const outputText = data.output_text
+    ?? data.output?.flatMap(item => item.content ?? []).find(part => part.type === 'output_text')?.text;
+  if (!outputText) throw new Error('DeepSeek returned no structured output');
+  return JSON.parse(outputText) as { category: string; color: string; material: string; features: string[]; location: string; time: string };
 }
