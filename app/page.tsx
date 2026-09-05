@@ -1,53 +1,694 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Bell, Camera, Check, ChevronRight, Clock3, LoaderCircle, MapPin, Search, ShieldCheck, Sparkles, Upload } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowRight,
+    Bell,
+    Camera,
+    Check,
+    ChevronRight,
+    Clock3,
+    LoaderCircle,
+    MapPin,
+    Search,
+    ShieldCheck,
+    Sparkles,
+    Upload,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
 type View = 'home' | 'results' | 'report' | 'verify';
+type Analysis = {
+    category: string;
+    color: string;
+    material: string;
+    features: string[];
+    location: string;
+    time: string;
+};
 const matches = [
-  { rank: 1, score: 94, name: '白色保温杯', place: '体育馆 · 二层看台', time: '昨天 16:20', detail: '蓝色杯盖、杯身有卡通贴纸', image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=900&q=85' },
-  { rank: 2, score: 78, name: '白色运动水杯', place: '体育馆 · 羽毛球场', time: '昨天 18:05', detail: '浅蓝色旋盖、杯身无图案', image: 'https://images.unsplash.com/photo-1605714196241-00bf7a8fe7bb?auto=format&fit=crop&w=900&q=85' },
-  { rank: 3, score: 62, name: '银白色随行杯', place: '南区操场', time: '9月3日 17:40', detail: '蓝色杯套、杯底有轻微划痕', image: 'https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=900&q=85' },
+    {
+        rank: 1,
+        score: 94,
+        name: '白色保温杯',
+        place: '体育馆 · 二层看台',
+        time: '昨天 16:20',
+        detail: '蓝色杯盖、杯身有卡通贴纸',
+        image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=900&q=85',
+    },
+    {
+        rank: 2,
+        score: 78,
+        name: '白色运动水杯',
+        place: '体育馆 · 羽毛球场',
+        time: '昨天 18:05',
+        detail: '浅蓝色旋盖、杯身无图案',
+        image: 'https://images.unsplash.com/photo-1605714196241-00bf7a8fe7bb?auto=format&fit=crop&w=900&q=85',
+    },
+    {
+        rank: 3,
+        score: 62,
+        name: '银白色随行杯',
+        place: '南区操场',
+        time: '9月3日 17:40',
+        detail: '蓝色杯套、杯底有轻微划痕',
+        image: 'https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=900&q=85',
+    },
 ];
 
 export default function Home() {
-  const [view, setView] = useState<View>('home');
-  const [query, setQuery] = useState('我昨天体育课以后，把一个白色水杯落在体育馆了，上面有蓝色的杯盖和卡通贴纸。');
-  const [loading, setLoading] = useState(false);
-  const [reportStep, setReportStep] = useState<'upload' | 'recognizing' | 'confirm' | 'done'>('upload');
-  const [verifyStep, setVerifyStep] = useState<'question' | 'success'>('question');
-  const [notice, setNotice] = useState('');
+    const [view, setView] = useState<View>('home');
+    const [query, setQuery] = useState(
+        '我昨天体育课以后，把一个白色水杯落在体育馆了，上面有蓝色的杯盖和卡通贴纸。',
+    );
+    const [loading, setLoading] = useState(false);
+    const [reportStep, setReportStep] = useState<
+        'upload' | 'recognizing' | 'confirm' | 'done'
+    >('upload');
+    const [verifyStep, setVerifyStep] = useState<'question' | 'success'>(
+        'question',
+    );
+    const [notice, setNotice] = useState('');
+    const [displayedMatches, setDisplayedMatches] = useState(matches);
+    const [reportImage, setReportImage] = useState('');
+    const [analysis, setAnalysis] = useState<Analysis>({
+        category: '保温杯',
+        color: '白色',
+        material: '不锈钢',
+        features: ['蓝色杯盖', '杯身有卡通贴纸'],
+        location: '体育馆',
+        time: '9月5日 16:20',
+    });
 
-  function go(next: View) { setView(next); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function toast(text: string) { setNotice(text); window.setTimeout(() => setNotice(''), 2200); }
-  function search() { setLoading(true); window.setTimeout(() => { setLoading(false); go('results'); }, 850); }
-  function upload() { setReportStep('recognizing'); window.setTimeout(() => setReportStep('confirm'), 900); }
+    function go(next: View) {
+        setView(next);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function toast(text: string) {
+        setNotice(text);
+        window.setTimeout(() => setNotice(''), 2200);
+    }
+    async function search() {
+        setLoading(true);
+        try {
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query }),
+            });
+            if (!response.ok) throw new Error();
+            const data = (await response.json()) as {
+                matches?: Array<{
+                    category: string;
+                    color: string;
+                    found_location: string;
+                    found_time: string;
+                    features: string[];
+                    score: number;
+                }>;
+            };
+            if (data.matches?.length)
+                setDisplayedMatches(
+                    data.matches.map((item, i) => ({
+                        rank: i + 1,
+                        score: item.score,
+                        name: `${item.color}${item.category}`,
+                        place: item.found_location,
+                        time: item.found_time,
+                        detail: item.features.join('、'),
+                        image: matches[i]?.image ?? matches[0].image,
+                    })),
+                );
+        } catch {
+            toast('尚未配置 API Key，当前展示演示匹配结果');
+        } finally {
+            setLoading(false);
+            go('results');
+        }
+    }
+    async function upload(file: File) {
+        setReportStep('recognizing');
+        const image = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        setReportImage(image);
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image }),
+            });
+            if (!response.ok) throw new Error();
+            setAnalysis((await response.json()) as Analysis);
+        } catch {
+            toast('尚未配置 API Key，当前展示演示识别结果');
+        }
+        setReportStep('confirm');
+    }
+    async function publishItem() {
+        try {
+            const response = await fetch('/api/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...analysis, image: reportImage }),
+            });
+            if (!response.ok) throw new Error();
+            setReportStep('done');
+        } catch {
+            toast('后端尚未启用，已完成界面演示');
+            setReportStep('done');
+        }
+    }
 
-  return <main className="min-h-screen bg-background text-foreground">
-    <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
-        <button onClick={() => go('home')} className="flex items-center gap-2.5"><span className="grid size-9 place-items-center rounded-xl bg-[#126f77] text-white"><Sparkles className="size-5" /></span><span className="text-lg font-bold">拾光</span><span className="hidden text-xs text-slate-400 sm:inline">AI 校园失物招领</span></button>
-        <div className="hidden items-center gap-2 text-xs font-medium text-slate-400 md:flex"><span className={view === 'home' ? 'text-[#126f77]' : ''}>描述失物</span><ChevronRight className="size-3" /><span className={view === 'results' ? 'text-[#126f77]' : ''}>AI 匹配</span><ChevronRight className="size-3" /><span className={view === 'verify' ? 'text-[#126f77]' : ''}>安全领取</span></div>
-        <div className="flex items-center gap-2"><Button onClick={() => toast('暂时没有新的失物消息')} variant="ghost" size="icon" className="rounded-full text-slate-500"><Bell /></Button><button onClick={() => toast('已登录：林同学')} className="grid size-8 place-items-center rounded-full bg-[#e6f4f1] text-xs font-bold text-[#126f77]">林</button></div>
-      </div>
-    </header>
+    return (
+        <main className="min-h-screen bg-background text-foreground">
+            <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
+                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
+                    <button
+                        onClick={() => go('home')}
+                        className="flex items-center gap-2.5"
+                    >
+                        <span className="grid size-9 place-items-center rounded-xl bg-[#126f77] text-white">
+                            <Sparkles className="size-5" />
+                        </span>
+                        <span className="text-lg font-bold">拾光</span>
+                        <span className="hidden text-xs text-slate-400 sm:inline">
+                            AI 校园失物招领
+                        </span>
+                    </button>
+                    <div className="hidden items-center gap-2 text-xs font-medium text-slate-400 md:flex">
+                        <span
+                            className={view === 'home' ? 'text-[#126f77]' : ''}
+                        >
+                            描述失物
+                        </span>
+                        <ChevronRight className="size-3" />
+                        <span
+                            className={
+                                view === 'results' ? 'text-[#126f77]' : ''
+                            }
+                        >
+                            AI 匹配
+                        </span>
+                        <ChevronRight className="size-3" />
+                        <span
+                            className={
+                                view === 'verify' ? 'text-[#126f77]' : ''
+                            }
+                        >
+                            安全领取
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            onClick={() => toast('暂时没有新的失物消息')}
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full text-slate-500"
+                        >
+                            <Bell />
+                        </Button>
+                        <button
+                            onClick={() => toast('已登录：林同学')}
+                            className="grid size-8 place-items-center rounded-full bg-[#e6f4f1] text-xs font-bold text-[#126f77]"
+                        >
+                            林
+                        </button>
+                    </div>
+                </div>
+            </header>
 
-    {view === 'home' && <>
-      <section className="relative border-b border-slate-200/70 bg-[#f6faf9]"><div className="absolute inset-0 opacity-40 [background-image:radial-gradient(#7ab7ad_1px,transparent_1px)] [background-size:22px_22px]" /><div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-20">
-        <div><div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#b9dcd5] bg-white px-3 py-1.5 text-xs font-semibold text-[#126f77]"><Sparkles className="size-3.5" /> AI 正在帮全校找回遗失</div><h1 className="text-4xl font-bold leading-[1.12] tracking-[-0.045em] text-slate-900 sm:text-6xl">丢了东西？<br/><span className="text-[#126f77]">说出来，就能找到。</span></h1><p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">不用翻遍失物群，也不用填写复杂表格。AI 同时理解图片、描述、时间和地点。</p><div className="mt-7 flex flex-wrap gap-4 text-sm text-slate-500">{['自然语言描述','多模态匹配','隐私领取验证'].map(x => <span key={x} className="flex items-center gap-1.5"><Check className="size-4 text-[#21a179]" />{x}</span>)}</div></div>
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_rgba(25,77,75,.13)] sm:p-6"><div className="mb-4 flex justify-between"><div><p className="text-sm font-bold">告诉 AI，你丢了什么</p><p className="mt-1 text-xs text-slate-400">像和同学说话一样描述就好</p></div><span className="h-fit rounded-full bg-[#eaf7f3] px-2.5 py-1 text-[11px] font-semibold text-[#13766d]">● AI 在线</span></div><div className="rounded-2xl border border-slate-200 bg-[#fbfdfd] p-2"><Textarea value={query} onChange={e => setQuery(e.target.value)} className="min-h-28 resize-none border-0 bg-transparent px-3 py-3 text-[15px] leading-6 shadow-none focus-visible:ring-0"/><div className="flex items-center justify-between border-t border-slate-100 px-2 pt-2"><label className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-slate-500 hover:bg-slate-100"><Camera className="size-4"/> 添加参考照片<input type="file" accept="image/*" className="sr-only" onChange={e => e.target.files?.[0] && toast('参考照片已添加')}/></label><Button onClick={search} disabled={loading || !query.trim()} className="h-10 rounded-xl bg-[#126f77] px-5">{loading ? <LoaderCircle className="animate-spin"/> : <Search/>}{loading ? 'AI 匹配中' : '帮我找找'}</Button></div></div><button onClick={() => go('report')} className="mt-5 flex w-full items-center justify-between rounded-2xl bg-[#eef7ff] p-3.5 text-left transition hover:bg-[#e4f2ff]"><span className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-white text-[#3979a8]"><Camera className="size-5"/></span><span><strong className="block text-sm text-slate-800">捡到了东西？</strong><small className="text-slate-500">进入拍照登记界面</small></span></span><ChevronRight className="size-5 text-[#3979a8]"/></button></div>
-      </div></section>
-      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8"><div className="text-center"><p className="text-sm font-semibold text-[#126f77]">四个 AI 能力</p><h2 className="mt-2 text-3xl font-bold">从捡到，到找回，一次完成</h2></div><div className="mt-9 grid gap-4 md:grid-cols-4">{[['01','AI 失物登记','拍照自动提取物品特征'],['02','AI 智能寻物','一句话描述即可开始'],['03','AI 多模态匹配','图片、文字、时间、地点'],['04','AI 领取验证','隐藏细节防止冒领']].map(([n,t,d]) => <div key={n} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><span className="text-xs font-bold text-[#21a179]">{n}</span><h3 className="mt-3 font-bold">{t}</h3><p className="mt-2 text-sm text-slate-500">{d}</p></div>)}</div></section>
-    </>}
+            {view === 'home' && (
+                <>
+                    <section className="relative border-b border-slate-200/70 bg-[#f6faf9]">
+                        <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(#7ab7ad_1px,transparent_1px)] [background-size:22px_22px]" />
+                        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-20">
+                            <div>
+                                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#b9dcd5] bg-white px-3 py-1.5 text-xs font-semibold text-[#126f77]">
+                                    <Sparkles className="size-3.5" /> AI
+                                    正在帮全校找回遗失
+                                </div>
+                                <h1 className="text-4xl font-bold leading-[1.12] tracking-[-0.045em] text-slate-900 sm:text-6xl">
+                                    丢了东西？
+                                    <br />
+                                    <span className="text-[#126f77]">
+                                        说出来，就能找到。
+                                    </span>
+                                </h1>
+                                <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
+                                    不用翻遍失物群，也不用填写复杂表格。AI
+                                    同时理解图片、描述、时间和地点。
+                                </p>
+                                <div className="mt-7 flex flex-wrap gap-4 text-sm text-slate-500">
+                                    {[
+                                        '自然语言描述',
+                                        '多模态匹配',
+                                        '隐私领取验证',
+                                    ].map((x) => (
+                                        <span
+                                            key={x}
+                                            className="flex items-center gap-1.5"
+                                        >
+                                            <Check className="size-4 text-[#21a179]" />
+                                            {x}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_rgba(25,77,75,.13)] sm:p-6">
+                                <div className="mb-4 flex justify-between">
+                                    <div>
+                                        <p className="text-sm font-bold">
+                                            告诉 AI，你丢了什么
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            像和同学说话一样描述就好
+                                        </p>
+                                    </div>
+                                    <span className="h-fit rounded-full bg-[#eaf7f3] px-2.5 py-1 text-[11px] font-semibold text-[#13766d]">
+                                        ● AI 在线
+                                    </span>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-[#fbfdfd] p-2">
+                                    <Textarea
+                                        value={query}
+                                        onChange={(e) =>
+                                            setQuery(e.target.value)
+                                        }
+                                        className="min-h-28 resize-none border-0 bg-transparent px-3 py-3 text-[15px] leading-6 shadow-none focus-visible:ring-0"
+                                    />
+                                    <div className="flex items-center justify-between border-t border-slate-100 px-2 pt-2">
+                                        <label className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-slate-500 hover:bg-slate-100">
+                                            <Camera className="size-4" />{' '}
+                                            添加参考照片
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="sr-only"
+                                                onChange={(e) =>
+                                                    e.target.files?.[0] &&
+                                                    toast('参考照片已添加')
+                                                }
+                                            />
+                                        </label>
+                                        <Button
+                                            onClick={search}
+                                            disabled={loading || !query.trim()}
+                                            className="h-10 rounded-xl bg-[#126f77] px-5"
+                                        >
+                                            {loading ? (
+                                                <LoaderCircle className="animate-spin" />
+                                            ) : (
+                                                <Search />
+                                            )}
+                                            {loading ? 'AI 匹配中' : '帮我找找'}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => go('report')}
+                                    className="mt-5 flex w-full items-center justify-between rounded-2xl bg-[#eef7ff] p-3.5 text-left transition hover:bg-[#e4f2ff]"
+                                >
+                                    <span className="flex items-center gap-3">
+                                        <span className="grid size-10 place-items-center rounded-xl bg-white text-[#3979a8]">
+                                            <Camera className="size-5" />
+                                        </span>
+                                        <span>
+                                            <strong className="block text-sm text-slate-800">
+                                                捡到了东西？
+                                            </strong>
+                                            <small className="text-slate-500">
+                                                进入拍照登记界面
+                                            </small>
+                                        </span>
+                                    </span>
+                                    <ChevronRight className="size-5 text-[#3979a8]" />
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                    <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+                        <div className="text-center">
+                            <p className="text-sm font-semibold text-[#126f77]">
+                                四个 AI 能力
+                            </p>
+                            <h2 className="mt-2 text-3xl font-bold">
+                                从捡到，到找回，一次完成
+                            </h2>
+                        </div>
+                        <div className="mt-9 grid gap-4 md:grid-cols-4">
+                            {[
+                                ['01', 'AI 失物登记', '拍照自动提取物品特征'],
+                                ['02', 'AI 智能寻物', '一句话描述即可开始'],
+                                [
+                                    '03',
+                                    'AI 多模态匹配',
+                                    '图片、文字、时间、地点',
+                                ],
+                                ['04', 'AI 领取验证', '隐藏细节防止冒领'],
+                            ].map(([n, t, d]) => (
+                                <div
+                                    key={n}
+                                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                                >
+                                    <span className="text-xs font-bold text-[#21a179]">
+                                        {n}
+                                    </span>
+                                    <h3 className="mt-3 font-bold">{t}</h3>
+                                    <p className="mt-2 text-sm text-slate-500">
+                                        {d}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </>
+            )}
 
-    {view === 'results' && <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8"><button onClick={() => go('home')} className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#126f77]"><ArrowLeft className="size-4"/> 返回重新描述</button><div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="flex items-center gap-2 text-sm font-semibold text-[#126f77]"><Sparkles className="size-4"/> AI 分析完成</p><h1 className="mt-2 text-3xl font-bold">找到 3 件疑似物品</h1><p className="mt-2 max-w-2xl text-sm text-slate-500">“{query}”</p></div><div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">视觉 50% + 文字 25% + 地点 15% + 时间 10%</div></div><div className="grid gap-5 lg:grid-cols-3">{matches.map(item => <article key={item.rank} className={`overflow-hidden rounded-3xl border bg-white ${item.rank === 1 ? 'border-[#8fcbbf] shadow-xl' : 'border-slate-200 shadow-sm'}`}><div className="relative h-52 overflow-hidden"><img src={item.image} alt={item.name} className="h-full w-full object-cover"/><div className="absolute inset-x-0 top-0 flex justify-between p-4"><span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold">{item.rank === 1 ? '🥇 最可能是它' : `候选 ${item.rank}`}</span><span className="rounded-full bg-[#126f77] px-3 py-1 text-sm font-bold text-white">{item.score}%</span></div></div><div className="p-5"><h2 className="text-lg font-bold">{item.name}</h2><div className="mt-4 space-y-2 text-sm text-slate-500"><p className="flex gap-2"><MapPin className="size-4"/>{item.place}</p><p className="flex gap-2"><Clock3 className="size-4"/>{item.time}</p></div><p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><strong>识别特征：</strong>{item.detail}</p><Button onClick={() => go('verify')} className="mt-5 h-11 w-full rounded-xl bg-[#126f77]">这是我的 <ArrowRight/></Button></div></article>)}</div></section>}
+            {view === 'results' && (
+                <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
+                    <button
+                        onClick={() => go('home')}
+                        className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#126f77]"
+                    >
+                        <ArrowLeft className="size-4" /> 返回重新描述
+                    </button>
+                    <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                        <div>
+                            <p className="flex items-center gap-2 text-sm font-semibold text-[#126f77]">
+                                <Sparkles className="size-4" /> AI 分析完成
+                            </p>
+                            <h1 className="mt-2 text-3xl font-bold">
+                                找到 {displayedMatches.length} 件疑似物品
+                            </h1>
+                            <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                                “{query}”
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+                            视觉 50% + 文字 25% + 地点 15% + 时间 10%
+                        </div>
+                    </div>
+                    <div className="grid gap-5 lg:grid-cols-3">
+                        {displayedMatches.map((item) => (
+                            <article
+                                key={item.rank}
+                                className={`overflow-hidden rounded-3xl border bg-white ${item.rank === 1 ? 'border-[#8fcbbf] shadow-xl' : 'border-slate-200 shadow-sm'}`}
+                            >
+                                <div className="relative h-52 overflow-hidden">
+                                    <img
+                                        src={item.image}
+                                        alt={item.name}
+                                        className="h-full w-full object-cover"
+                                    />
+                                    <div className="absolute inset-x-0 top-0 flex justify-between p-4">
+                                        <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold">
+                                            {item.rank === 1
+                                                ? '🥇 最可能是它'
+                                                : `候选 ${item.rank}`}
+                                        </span>
+                                        <span className="rounded-full bg-[#126f77] px-3 py-1 text-sm font-bold text-white">
+                                            {item.score}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="p-5">
+                                    <h2 className="text-lg font-bold">
+                                        {item.name}
+                                    </h2>
+                                    <div className="mt-4 space-y-2 text-sm text-slate-500">
+                                        <p className="flex gap-2">
+                                            <MapPin className="size-4" />
+                                            {item.place}
+                                        </p>
+                                        <p className="flex gap-2">
+                                            <Clock3 className="size-4" />
+                                            {item.time}
+                                        </p>
+                                    </div>
+                                    <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                                        <strong>识别特征：</strong>
+                                        {item.detail}
+                                    </p>
+                                    <Button
+                                        onClick={() => go('verify')}
+                                        className="mt-5 h-11 w-full rounded-xl bg-[#126f77]"
+                                    >
+                                        这是我的 <ArrowRight />
+                                    </Button>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                </section>
+            )}
 
-    {view === 'report' && <section className="mx-auto max-w-4xl px-5 py-10 sm:px-8"><button onClick={() => { setReportStep('upload'); go('home'); }} className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#126f77]"><ArrowLeft className="size-4"/> 返回首页</button><div className="mb-8"><p className="text-sm font-semibold text-[#3979a8]">AI 失物登记</p><h1 className="mt-2 text-3xl font-bold">拍张照片，自动完成登记</h1><p className="mt-2 text-sm text-slate-500">整个过程只需要确认一次，预计用时 20 秒。</p></div><div className="grid gap-6 md:grid-cols-[1fr_280px]"><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">{reportStep === 'upload' && <label className="grid min-h-[360px] cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-[#a9d0c8] bg-[#f3faf8] text-center hover:bg-[#eaf6f3]"><span><span className="mx-auto grid size-16 place-items-center rounded-2xl bg-white text-[#126f77] shadow-sm"><Upload className="size-7"/></span><strong className="mt-4 block">拍照或上传物品图片</strong><small className="mt-1 block text-slate-400">点击这里开始演示</small></span><input type="file" accept="image/*" capture="environment" className="sr-only" onChange={e => e.target.files?.[0] && upload()}/></label>}{reportStep === 'recognizing' && <div className="grid min-h-[360px] place-items-center text-center"><div><LoaderCircle className="mx-auto size-10 animate-spin text-[#126f77]"/><h2 className="mt-5 font-bold">AI 正在理解图片</h2><p className="mt-2 text-sm text-slate-400">识别类别、颜色、材质和明显特征…</p></div></div>}{reportStep === 'confirm' && <div><p className="flex items-center gap-2 text-sm font-bold text-emerald-700"><Check className="size-4"/> AI 识别完成，请确认</p><dl className="mt-6 grid grid-cols-[90px_1fr] gap-y-4 rounded-2xl bg-slate-50 p-5 text-sm"><dt className="text-slate-400">物品</dt><dd className="font-semibold">保温杯</dd><dt className="text-slate-400">颜色</dt><dd>白色</dd><dt className="text-slate-400">材质</dt><dd>不锈钢</dd><dt className="text-slate-400">明显特征</dt><dd>蓝色杯盖、杯身有卡通贴纸</dd><dt className="text-slate-400">发现地点</dt><dd>体育馆</dd><dt className="text-slate-400">发现时间</dt><dd>9月5日 16:20</dd></dl><Button onClick={() => setReportStep('done')} className="mt-6 h-11 w-full rounded-xl bg-[#126f77]">确认并发布</Button></div>}{reportStep === 'done' && <div className="grid min-h-[360px] place-items-center text-center"><div><span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-emerald-700"><Check className="size-8"/></span><h2 className="mt-5 text-2xl font-bold">登记成功</h2><p className="mt-2 text-sm text-slate-500">AI 已将它加入校园失物库，并开始自动匹配。</p><Button onClick={() => { setReportStep('upload'); go('home'); }} className="mt-6 rounded-xl bg-[#126f77]">完成演示</Button></div></div>}</div><aside className="rounded-3xl bg-[#153f47] p-6 text-white"><p className="text-xs font-semibold text-[#8be0cf]">演示进度</p>{[['1','上传照片'],['2','AI 自动识别'],['3','确认并发布']].map(([n,t],i) => <div key={n} className="mt-6 flex items-center gap-3"><span className="grid size-8 place-items-center rounded-full bg-white/10 text-xs font-bold">{n}</span><span className="text-sm">{t}</span></div>)}</aside></div></section>}
+            {view === 'report' && (
+                <section className="mx-auto max-w-4xl px-5 py-10 sm:px-8">
+                    <button
+                        onClick={() => {
+                            setReportStep('upload');
+                            go('home');
+                        }}
+                        className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#126f77]"
+                    >
+                        <ArrowLeft className="size-4" /> 返回首页
+                    </button>
+                    <div className="mb-8">
+                        <p className="text-sm font-semibold text-[#3979a8]">
+                            AI 失物登记
+                        </p>
+                        <h1 className="mt-2 text-3xl font-bold">
+                            拍张照片，自动完成登记
+                        </h1>
+                        <p className="mt-2 text-sm text-slate-500">
+                            整个过程只需要确认一次，预计用时 20 秒。
+                        </p>
+                    </div>
+                    <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            {reportStep === 'upload' && (
+                                <label className="grid min-h-[360px] cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-[#a9d0c8] bg-[#f3faf8] text-center hover:bg-[#eaf6f3]">
+                                    <span>
+                                        <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-white text-[#126f77] shadow-sm">
+                                            <Upload className="size-7" />
+                                        </span>
+                                        <strong className="mt-4 block">
+                                            拍照或上传物品图片
+                                        </strong>
+                                        <small className="mt-1 block text-slate-400">
+                                            点击这里开始演示
+                                        </small>
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        className="sr-only"
+                                        onChange={(e) =>
+                                            e.target.files?.[0] &&
+                                            upload(e.target.files[0])
+                                        }
+                                    />
+                                </label>
+                            )}
+                            {reportStep === 'recognizing' && (
+                                <div className="grid min-h-[360px] place-items-center text-center">
+                                    <div>
+                                        <LoaderCircle className="mx-auto size-10 animate-spin text-[#126f77]" />
+                                        <h2 className="mt-5 font-bold">
+                                            AI 正在理解图片
+                                        </h2>
+                                        <p className="mt-2 text-sm text-slate-400">
+                                            识别类别、颜色、材质和明显特征…
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            {reportStep === 'confirm' && (
+                                <div>
+                                    <p className="flex items-center gap-2 text-sm font-bold text-emerald-700">
+                                        <Check className="size-4" /> AI
+                                        识别完成，请确认
+                                    </p>
+                                    <dl className="mt-6 grid grid-cols-[90px_1fr] gap-y-4 rounded-2xl bg-slate-50 p-5 text-sm">
+                                        <dt className="text-slate-400">物品</dt>
+                                        <dd className="font-semibold">
+                                            {analysis.category}
+                                        </dd>
+                                        <dt className="text-slate-400">颜色</dt>
+                                        <dd>{analysis.color}</dd>
+                                        <dt className="text-slate-400">材质</dt>
+                                        <dd>{analysis.material}</dd>
+                                        <dt className="text-slate-400">
+                                            明显特征
+                                        </dt>
+                                        <dd>{analysis.features.join('、')}</dd>
+                                        <dt className="text-slate-400">
+                                            发现地点
+                                        </dt>
+                                        <dd>{analysis.location}</dd>
+                                        <dt className="text-slate-400">
+                                            发现时间
+                                        </dt>
+                                        <dd>{analysis.time}</dd>
+                                    </dl>
+                                    <Button
+                                        onClick={publishItem}
+                                        className="mt-6 h-11 w-full rounded-xl bg-[#126f77]"
+                                    >
+                                        确认并发布
+                                    </Button>
+                                </div>
+                            )}
+                            {reportStep === 'done' && (
+                                <div className="grid min-h-[360px] place-items-center text-center">
+                                    <div>
+                                        <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+                                            <Check className="size-8" />
+                                        </span>
+                                        <h2 className="mt-5 text-2xl font-bold">
+                                            登记成功
+                                        </h2>
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            AI
+                                            已将它加入校园失物库，并开始自动匹配。
+                                        </p>
+                                        <Button
+                                            onClick={() => {
+                                                setReportStep('upload');
+                                                go('home');
+                                            }}
+                                            className="mt-6 rounded-xl bg-[#126f77]"
+                                        >
+                                            完成演示
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <aside className="rounded-3xl bg-[#153f47] p-6 text-white">
+                            <p className="text-xs font-semibold text-[#8be0cf]">
+                                演示进度
+                            </p>
+                            {[
+                                ['1', '上传照片'],
+                                ['2', 'AI 自动识别'],
+                                ['3', '确认并发布'],
+                            ].map(([n, t], i) => (
+                                <div
+                                    key={n}
+                                    className="mt-6 flex items-center gap-3"
+                                >
+                                    <span className="grid size-8 place-items-center rounded-full bg-white/10 text-xs font-bold">
+                                        {n}
+                                    </span>
+                                    <span className="text-sm">{t}</span>
+                                </div>
+                            ))}
+                        </aside>
+                    </div>
+                </section>
+            )}
 
-    {view === 'verify' && <section className="mx-auto max-w-3xl px-5 py-10 sm:px-8"><button onClick={() => { setVerifyStep('question'); go('results'); }} className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#126f77]"><ArrowLeft className="size-4"/> 返回匹配结果</button><div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl sm:p-10">{verifyStep === 'question' ? <><span className="grid size-14 place-items-center rounded-2xl bg-[#e9f7f2] text-[#14786e]"><ShieldCheck className="size-7"/></span><p className="mt-6 text-sm font-semibold text-[#126f77]">AI 领取验证</p><h1 className="mt-2 text-3xl font-bold">验证一个未公开的小细节</h1><p className="mt-3 leading-7 text-slate-500">为防止冒领，请描述只有真正失主知道的细节。本演示在当前页面直接验证，无须提交给任何人。</p><div className="mt-7 rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-400">当前领取物品</p><div className="mt-3 flex items-center gap-4"><img src={matches[0].image} alt="白色保温杯" className="size-16 rounded-xl object-cover"/><div><strong>白色保温杯</strong><p className="mt-1 text-sm text-slate-500">体育馆 · 昨天 16:20</p></div></div></div><label className="mt-7 block text-sm font-semibold">请描述未公开细节<Textarea className="mt-2 min-h-28 rounded-xl" placeholder="例如：杯底写了什么？杯内是否还有物品？" defaultValue="杯底写着我的名字缩写 LXY，里面还有半杯水。"/></label><Button onClick={() => setVerifyStep('success')} className="mt-5 h-11 w-full rounded-xl bg-[#126f77]">立即验证 <ArrowRight/></Button></> : <div className="py-10 text-center"><span className="mx-auto grid size-20 place-items-center rounded-full bg-emerald-100 text-emerald-700"><Check className="size-10"/></span><h1 className="mt-6 text-3xl font-bold">验证完成</h1><p className="mx-auto mt-3 max-w-md leading-7 text-slate-500">系统已确认物品细节匹配。请携带校园卡前往体育馆一层服务台，由工作人员协助完成领取。</p><Button onClick={() => { setVerifyStep('question'); go('home'); }} className="mt-7 rounded-xl bg-[#126f77]">完成演示，返回首页</Button></div>}</div></section>}
+            {view === 'verify' && (
+                <section className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
+                    <button
+                        onClick={() => {
+                            setVerifyStep('question');
+                            go('results');
+                        }}
+                        className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#126f77]"
+                    >
+                        <ArrowLeft className="size-4" /> 返回匹配结果
+                    </button>
+                    <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl sm:p-10">
+                        {verifyStep === 'question' ? (
+                            <>
+                                <span className="grid size-14 place-items-center rounded-2xl bg-[#e9f7f2] text-[#14786e]">
+                                    <ShieldCheck className="size-7" />
+                                </span>
+                                <p className="mt-6 text-sm font-semibold text-[#126f77]">
+                                    AI 领取验证
+                                </p>
+                                <h1 className="mt-2 text-3xl font-bold">
+                                    验证一个未公开的小细节
+                                </h1>
+                                <p className="mt-3 leading-7 text-slate-500">
+                                    为防止冒领，请描述只有真正失主知道的细节。本演示在当前页面直接验证，无须提交给任何人。
+                                </p>
+                                <div className="mt-7 rounded-2xl bg-slate-50 p-4">
+                                    <p className="text-xs font-semibold text-slate-400">
+                                        当前领取物品
+                                    </p>
+                                    <div className="mt-3 flex items-center gap-4">
+                                        <img
+                                            src={matches[0].image}
+                                            alt="白色保温杯"
+                                            className="size-16 rounded-xl object-cover"
+                                        />
+                                        <div>
+                                            <strong>白色保温杯</strong>
+                                            <p className="mt-1 text-sm text-slate-500">
+                                                体育馆 · 昨天 16:20
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <label className="mt-7 block text-sm font-semibold">
+                                    请描述未公开细节
+                                    <Textarea
+                                        className="mt-2 min-h-28 rounded-xl"
+                                        placeholder="例如：杯底写了什么？杯内是否还有物品？"
+                                        defaultValue="杯底写着我的名字缩写 LXY，里面还有半杯水。"
+                                    />
+                                </label>
+                                <Button
+                                    onClick={() => setVerifyStep('success')}
+                                    className="mt-5 h-11 w-full rounded-xl bg-[#126f77]"
+                                >
+                                    立即验证 <ArrowRight />
+                                </Button>
+                            </>
+                        ) : (
+                            <div className="py-10 text-center">
+                                <span className="mx-auto grid size-20 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+                                    <Check className="size-10" />
+                                </span>
+                                <h1 className="mt-6 text-3xl font-bold">
+                                    验证完成
+                                </h1>
+                                <p className="mx-auto mt-3 max-w-md leading-7 text-slate-500">
+                                    系统已确认物品细节匹配。请携带校园卡前往体育馆一层服务台，由工作人员协助完成领取。
+                                </p>
+                                <Button
+                                    onClick={() => {
+                                        setVerifyStep('question');
+                                        go('home');
+                                    }}
+                                    className="mt-7 rounded-xl bg-[#126f77]"
+                                >
+                                    完成演示，返回首页
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
 
-    {notice && <div role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-2xl">{notice}</div>}
-  </main>;
+            {notice && (
+                <div
+                    role="status"
+                    className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-2xl"
+                >
+                    {notice}
+                </div>
+            )}
+        </main>
+    );
 }
